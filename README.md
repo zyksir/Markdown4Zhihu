@@ -1,18 +1,160 @@
-# Markdown4Zhihu
+# md2zhihu
 
-这是一个可以将您的Markdown文件一键转换为知乎编辑器支持模式的仓库。
+Converts markdown to a single-file version that has no local asset dependency
+and can be imported into zhihu.com with just one click.
 
-它会自动的处理图片，行内公式，多行公式，以及对表格的部分支持。当图片过大时，您可以选择加上`--compress`选项，对超过大小阈值（这里约为500K）的图片进行自动压缩。如果您的md文件和其图片文件夹在Data文件夹下，您本地的图片会自动转换为github上的raw链接。
-上传知乎后一切都是那么美好。
+|           | md                    | imported               |
+| :--       | :-:                   | :-:                    |
+| original  | ![](assets/md.png)    | ![](assets/before.png) |
+| converted | ![](assets/built.png) | ![](assets/after.png)  |
 
-## 使用方法
+## Usage
 
-1. 首先，您应当仿照本仓库建立一个类似的您自己的仓库，它包括一个Data文件夹与根目录下的`zhihu-publisher.py`。当然，您也可以选择直接folk本仓库到您自己的账号下。
+Add action definition into the git repo you have markdowns to convert:
+`.github/workflows/md2zhihu.yml`:
 
-2. 然后，打开`zhihu-publisher.py`文件，在文件开头有这么一句：`GITHUB_REPO_PREFIX = "https://raw.githubusercontent.com/miracleyoo/Markdown4Zhihu/master/Data/"`请修改`miracleyoo`为您自己的GitHub用户名，如果仓库名字也有变化，请做出相应微调。
+```yaml
+name: md2zhihu
+on: [push]
+jobs:
+  md2zhihu:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: drmingdrmer/md2zhihu@v0.5
+      env:
+        GITHUB_USERNAME: ${{ github.repository_owner }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        pattern: >
+            _posts/*.md
+            _posts/*.markdown
+```
 
-3. 这里我们假设您的文件名为`一个测试文档.md`，并将其和同名图片文件夹放到`Data`目录下，接着打开terminal(Linux/MacOS)或Git Bash(Windows)(或其他任何支持Git命令的终端)，输入以下命令：
+The next push github converts markdowns in `_posts/` and stores converted
+version in branch `_md2zhihu/md`.
 
-`python zhihu-publisher.py --input="./Data/一个测试文档.md"`
+E.g., the single-file version of all of my blog posts:
+https://github.com/drmingdrmer/drmingdrmer.github.io/tree/_md2zhihu/md/_md2zhihu
 
-4. OK，all set. 在`Data`目录下，你可以看到一个`一个测试文档_for_zhihu.md`的文件，将它上传至知乎编辑器即可。
+To retrieve the converted markdowns, merge branch `_md2zhihu/md`,
+or access the branch on the web:
+https://github.com/drmingdrmer/drmingdrmer.github.io/blob/_md2zhihu/md/_md2zhihu/dict-cmp.md
+
+
+### Options
+
+-   `pattern`:
+
+    file pattern to convert
+
+    **required**: True
+    **default**: `**/*.md`
+
+-   `output_dir`:
+
+    dir to store converted markdown
+
+    **required**: True
+    **default**: `_md2zhihu`
+
+-   `md_branch`:
+
+    The branch name to push converted markdown to. A build overrides previous built branch. If you want to persist the built markdowns, merge this branch.
+
+    **required**: True
+    **default**: `_md2zhihu/md`
+
+-   `asset_branch`:
+
+    The branch name in which assets are stored.
+
+    **required**: True
+    **default**: `_md2zhihu/asset`
+
+-   `target_platform`:
+
+    The platform that the converted markdown should be compatible toṫCurrently supported platforms are zhihu, wechat, weibo, simple. `simple` converts almost everything to images and removes most text styles. E.g. inline code block is converted to normal text.
+
+    **required**: True
+    **default**: `zhihu`
+
+
+
+## Use it Locally
+
+System requirement: MaxOS
+
+```sh
+# For rendering table to html
+brew install pandoc imagemagick node
+npm install -g @mermaid-js/mermaid-cli
+pip install md2zhihu
+```
+
+```sh
+md2zhihu your_great_work.md
+```
+
+This command convert `your_great_work.md` to
+`_md2/zhihu/your_great_work/your_great_work.md`.
+
+## Features
+
+- Transform latex to image:
+
+  E.g. ` $$ ||X{\vec {\beta }}-Y||^{2} $$ ` is converted to 
+  ![](https://www.zhihu.com/equation?tex=%7C%7CX%7B%5Cvec%20%7B%5Cbeta%20%7D%7D-Y%7C%7C%5E%7B2%7D)
+
+  ```
+  <img src="https://www.zhihu.com/equation?tex=||X{\vec {\beta }}-Y||^{2}\\" ...>
+  ```
+
+- Transform table to html.
+
+- Upload images.
+
+- Transform mermaid code block to image:
+
+    ```mermaid
+    graph LR
+        A[Hard edge] -->|Link text| B(Round edge)
+        B --> C{Decision}
+        C -->|One| D[Result one]
+        C -->|Two| E[Result two]
+    ```
+
+    is converted to:
+
+    ![](assets/mermaid.jpg)
+
+
+- Transform graphviz code block to image:
+
+    ```graphviz
+    digraph R {
+        node [shape=plaintext]
+        rankdir=LR
+        X0X0 [ label="0-0"]
+        X0X0 -> X1X0 [ color="#aaaadd"]
+        X0X0 -> X2X3 [ color="#aaaadd"]
+    }
+    ```
+    is converted to:
+
+    ![](assets/graphviz.jpg)
+
+
+-   Generate link list::
+
+    | original | converted | imported |
+    | :-: | :-: | :-: |
+    | ![](assets/ref-list/src.png) | ![](assets/ref-list/dst.png) | ![](assets/ref-list/imported.png) |
+
+
+## Limitation
+
+- zhihu.com does not support markdown syntax inside a table cell.
+  These in-table-cell content are transformed to plain text.
+
+- md2zhihu can not deal with jekyll/github page tags. E.g. `{% octicon mark-github height:24 %}`.
